@@ -683,4 +683,15 @@ contract sRAI is ERC20, Ownable {
     function totalSupply() public view virtual override returns (uint256) {
         return super.totalSupply();
     }
+    enum CONTRACTS { STAKING }
+
+    /**
+        @notice sets the contract address for LP staking
+        @param _contract address
+    */
+    function setContract( CONTRACTS _contract, address _address ) external onlyOwner() {
+        if( _contract == CONTRACTS.STAKING ) { // 0
+            stakingContract = _address;
+        } 
+    }
 }
