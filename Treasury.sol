@@ -351,7 +351,7 @@ abstract contract Ownable is Context {
     }
 }
 contract TreasuryContract is Ownable {
-    // Biến trạng thái
+    // State variables
     uint256 public totalTreasuryAssets;
     uint256 public totalTreasuryRiskFreeAssets;
     uint256 public raiSupply;
@@ -366,25 +366,25 @@ contract TreasuryContract is Ownable {
     uint256 public lpRAIBalance;
     uint256 public lpUSDTBalance;
 
-    // Địa chỉ hợp đồng liên quan
+    // Related contract addresses
     address public usdtAddress;
     address public bondContractAddress;
     address public salesContractAddress;
     address public stakingContractAddress;
     address public rewardVestingContractAddress;
     address public contributionValueContractAddress;
-     // Địa chỉ ví dev
+     // Dev wallet address
     address public devWallet;
 
     IUniswapV2Router02 public dexRouter;
     IUniswapV2Pair public lpPool;
 
-    // Các token ERC20
+    // ERC20 tokens
     IERC20 public usdtToken;
     IERC20 public raiToken;
     IERC20 public lpToken;
     
-    // Modifier để kiểm soát quyền truy cập
+    // Modifier for access control
     mapping(address => bool) public authorizedContracts;
 
     constructor(
@@ -414,40 +414,40 @@ contract TreasuryContract is Ownable {
         devWallet = _devWallet;
     }
     function deposit(
-         uint256 amount,
-         uint256 profit
+          uint256 amount,
+          uint256 profit
     ) external {
-     // 1. Kiểm tra người gọi
+    // 1. Check the caller
         require(msg.sender == bondContractAddress, "Not Bond Contract");
 
-        // 2. Chuyển USDT từ Bond Contract
+        // 2. Transfer USDT from Bond Contract
         usdtToken.transferFrom(bondContractAddress, address(this), amount);
 
-        // 3. Cập nhật số dư USDT
+        // 3. Update USDT balance
         usdtBalance += amount;
 
-        // 4. Cập nhật totalTreasuryAssets và totalTreasuryRiskFreeAssets
+        // 4. Update totalTreasuryAssets and totalTreasuryRiskFreeAssets
         totalTreasuryAssets += amount;
         totalTreasuryRiskFreeAssets += amount;
         emit USDTReceived(msg.sender, amount,profit);
-  }
+ }
 
     function mintRAIForStaking(address recipient, uint256 amount) external {
-       // 1. Kiểm tra người gọi
+    // 1. Check the caller
         require(msg.sender == stakingContractAddress, "Not Staking Contract");
 
-        // 2. Kiểm tra RFV
+        // 2. Check RFV
         require(raiSupply + amount <= totalTreasuryRiskFreeAssets / rfvPerRAI, "Insufficient RFV");
 
         // 3. Mint RAI
         raiToken._mint(recipient, amount);
 
-        // 4. Cập nhật raiSupply
+        // 4. Update raiSupply
         raiSupply += amount;
          emit RAIMinted(recipient, amount);
     }
     
-    // Chức năng quản lý tài sản
+    // Asset management functions
     function receiveUSDT(uint256 amount) external onlyAuthorized {
         usdtToken.transferFrom(msg.sender, address(this), amount);
         usdtBalance += amount;
@@ -459,13 +459,13 @@ contract TreasuryContract is Ownable {
         lpToken.transferFrom(msg.sender, address(this), amount);
         lpBalance += amount;
 
-        // Tính RFV của LP tokens
+        // Calculate RFV of LP tokens
         uint256 rfv = (amount * 2 * sqrt(lpRAIBalance * lpUSDTBalance)) / lpTotalSupply;
         totalTreasuryRiskFreeAssets += rfv;
 
-        // Tính giá trị thị trường của LP tokens
-        // ... (tính toán giá trị thị trường)
-        totalTreasuryAssets += 0; // Thay thế bằng giá trị thị trường
+        // Calculate market value of LP tokens
+        // ... (calculate market value)
+        totalTreasuryAssets += 0; // Replace with market value
     }
 
     function receiveLPFee(uint256 amount) external {
@@ -473,19 +473,19 @@ contract TreasuryContract is Ownable {
         totalTreasuryAssets += amount;
     }
 
-    // Chức năng mint RAI
+    // RAI minting function
     function mintRAI(uint256 amount, address recipient) external onlyAuthorized {
         require(raiSupply + amount <= totalTreasuryRiskFreeAssets / rfvPerRAI, "Insufficient RFV");
         raiToken._mint(recipient, amount);
         raiSupply += amount;
     }
 
-    // Chức năng kiểm soát LP
+    // LP control functions
     function addLiquidity(uint256 amountRAI, uint256 amountUSDT) external onlyOwner {
         raiToken.approve(address(dexRouter), amountRAI);
         usdtToken.approve(address(dexRouter), amountUSDT);
 
-        // 2. Thêm thanh khoản bằng Router
+        // 2. Add liquidity using Router
         dexRouter.addLiquidity(
             address(raiToken), // address tokenA
             address(usdtToken), // address tokenB
@@ -496,17 +496,17 @@ contract TreasuryContract is Ownable {
             address(this), // to
             block.timestamp // deadline
         );
-        // 3. Cập nhật thông tin pool
+        // 3. Update pool information
         lpTotalSupply = IERC20(address(lpPool)).totalSupply();
         (lpRAIBalance, lpUSDTBalance,) = lpPool.getReserves();
         emit LiquidityAdded(amountRAI, amountUSDT);
     }
 
     function removeLiquidity(uint256 amountLP) external onlyOwner {
-       // 1. Phê duyệt chuyển token LP cho Router
+        // 1. Approve LP token transfer for Router
         IERC20(address(lpPool)).approve(address(dexRouter), amountLP);
 
-        // 2. Rút thanh khoản bằng Router
+        // 2. Remove liquidity using Router
         dexRouter.removeLiquidity(
             address(raiToken), // address tokenA
             address(usdtToken), // address tokenB
@@ -516,43 +516,43 @@ contract TreasuryContract is Ownable {
             address(this), // to
             block.timestamp // deadline
         );
-        // 3. Cập nhật thông tin pool
+        // 3. Update pool information
         lpTotalSupply = lpPool.totalSupply();
         (lpRAIBalance, lpUSDTBalance,) = lpPool.getReserves();
          emit LiquidityRemoved(amountLP);
     }
-     // ... (thu phí giao dịch từ pool)
+     // ... (collect transaction fees from the pool)
     function collectLPFees() external onlyOwner {
-       
-         // 1. Lấy số dư USDT trong pool
+        
+        // 1. Get USDT balance in the pool
         uint256 usdtBalanceBefore = usdtToken.balanceOf(address(lpPool));
 
-        // 2. Đồng bộ hóa pool để cập nhật phí
+        // 2. Sync the pool to update fees
         lpPool.sync();
 
-        // 3. Lấy số dư USDT sau khi đồng bộ hóa
+        // 3. Get USDT balance after syncing
         uint256 usdtBalanceAfter = usdtToken.balanceOf(address(lpPool));
 
-        // 4. Tính toán phí thu được
+        // 4. Calculate collected fees
         uint256 collectedFees = usdtBalanceAfter - usdtBalanceBefore;
 
-        // 5. Chuyển phí từ pool vào hợp đồng TreasuryContract
+        // 5. Transfer fees from the pool to the TreasuryContract
         usdtToken.transferFrom(address(lpPool), address(this), collectedFees);
 
-        // 6. Cập nhật lpFeeBalance và totalTreasuryAssets
+        // 6. Update lpFeeBalance and totalTreasuryAssets
         lpFeeBalance += collectedFees;
         totalTreasuryAssets += collectedFees;
     }
 
-    // Chức năng buyback và burn RAI
+    // Buyback and burn RAI function
     function buybackAndBurnRAI(uint256 amountUSDT) external {
-        // 1. Kiểm tra số dư USDT
+        // 1. Check USDT balance
         require(usdtBalance >= amountUSDT, "Insufficient USDT balance");
 
-        // 2. Phê duyệt chuyển USDT cho Router
+        // 2. Approve USDT transfer for Router
         usdtToken.approve(address(dexRouter), amountUSDT);
 
-        // 3. Mua RAI từ pool
+        // 3. Buy RAI from the pool
          address[] memory path = new address[](2);
         path[0] = address(usdtToken);
         path[1] = address(raiToken);
@@ -564,19 +564,19 @@ contract TreasuryContract is Ownable {
             address(this), // to
             block.timestamp // deadline
         );
-        uint256 amountRAI = amounts[1]; // Số lượng RAI nhận được
+        uint256 amountRAI = amounts[1]; // Amount of RAI received
 
-        // 4. Đốt RAI
-        raiToken.transfer(address(0), amountRAI); // Chuyển RAI đến địa chỉ 0 (đốt)
-        raiSupply -= amountRAI; // Cập nhật tổng nguồn cung
-        raiBalance -= amountRAI; // Cập nhật số dư RAI
+        // 4. Burn RAI
+        raiToken.transfer(address(0), amountRAI); // Transfer RAI to address 0 (burn)
+        raiSupply -= amountRAI; // Update total supply
+        raiBalance -= amountRAI; // Update RAI balance
 
-        // 5. Cập nhật số dư USDT
+        // 5. Update USDT balance
         usdtBalance -= amountUSDT;
         emit RAIBurned(amountRAI);
     }
 
-    // Chức năng phân phối lợi nhuận
+    // Profit distribution function
     function distributeFees(uint256 amount) external {
         feeBalance += amount;
         totalTreasuryAssets += amount;
@@ -586,11 +586,11 @@ contract TreasuryContract is Ownable {
         uint256 devAmount = amount / 5;
 
         daoPoolBalance += buybackAmount;
-         // Kiểm tra số dư usdt trước khi mua RAI từ daoPoolBalance
+         // Check usdt balance before buying RAI from daoPoolBalance
         require(usdtBalance >= daoPoolBalance, "Insufficient USDT balance for buyback");
-         // Kiểm tra số dư daoPoolBalance trước khi mua NVB
+         // Check daoPoolBalance before buying NVB
         require(daoPoolBalance > 0, "Insufficient daoPoolBalance for buyback");
-        // Mua và đốt RAI từ daoPoolBalance
+        // Buy and burn RAI from daoPoolBalance
         usdtToken.approve(address(dexRouter), daoPoolBalance);
 
         address[] memory path = new address[](2);
@@ -614,25 +614,25 @@ contract TreasuryContract is Ownable {
         usdtBalance -= daoPoolBalance;
         daoPoolBalance = 0; // Reset daoPoolBalance
 
-        // ... (gửi devAmount cho ví dev)
+        // ... (send devAmount to dev wallet)
         require(usdtBalance >= devAmount, "Insufficient USDT balance");
         usdtToken.transfer(devWallet, devAmount);
         usdtBalance -= devAmount;
         emit FeesDistributed(buybackAmount, devAmount);
     }
 
-    // Chức năng tương tác với hợp đồng khác
+    // Function to interact with other contracts
     function setAuthorizedContracts(address contractAddress, bool isAuthorized) external onlyOwner {
         authorizedContracts[contractAddress] = isAuthorized;
     }
 
-    // Modifier kiểm soát quyền truy cập
+    // Access control modifier
     modifier onlyAuthorized() {
         require(authorizedContracts[msg.sender], "Not authorized");
         _;
     }
 
-    // Hàm tính căn bậc hai
+    // Square root function
     function sqrt(uint256 y) internal pure returns (uint256 z) {
         if (y > 3) {
             z = y;
@@ -648,9 +648,9 @@ contract TreasuryContract is Ownable {
     enum CONTRACTS { USDTTOKEN, RAITOKEN, LPTOKEN, DEXROUTER, LPPOOL, BOND, SALES, STAKING, REWARDVESTING, CONTRIBUTIONVALUECON,DEVWALLET }
 
     /**
-        @notice sets the contract address for LP staking
-        @param _contract address
-    */
+     * @notice sets the contract address for LP staking
+     * @param _contract address
+     */
     function setContract( CONTRACTS _contract, address _address ) external onlyOwner() {
         if( _contract == CONTRACTS.USDTTOKEN ) { // 0
             usdtToken = IERC20(_address);
